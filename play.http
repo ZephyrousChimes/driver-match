@@ -1,0 +1,38 @@
+@base = http://localhost:3000
+
+### Driver d1 comes online (MG Road)
+POST {{base}}/drivers/d1
+Content-Type: application/json
+Connection: keep-alive
+
+{ "lat": 12.97, "lon": 77.59 }
+
+### Driver d2 comes online (Koramangala)
+POST {{base}}/drivers/d2
+Content-Type: application/json
+
+{ "lat": 12.93, "lon": 77.62 }
+
+### Driver d2 moves (send again = new location)
+POST {{base}}/drivers/d2
+Content-Type: application/json
+
+{ "lat": 12.95, "lon": 77.64 }
+
+### Driver d1 goes offline
+DELETE {{base}}/drivers/d1
+
+### Rider r1 asks for a ride (near Koramangala). Send again = reconnect.
+POST {{base}}/riders/r1
+Content-Type: application/json
+
+{ "lat": 12.93, "lon": 77.61 }
+
+### Rider r1 cancels
+DELETE {{base}}/riders/r1
+
+### Rider r2 asks for a ride (near MG Road)
+POST {{base}}/riders/r2
+Content-Type: application/json
+
+{ "lat": 12.97, "lon": 77.60 }
