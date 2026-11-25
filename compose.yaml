@@ -5,9 +5,11 @@ services:
       - "3000:3000"
     environment:
       REDIS_URL: redis://redis:6379
-    init: true
+    init: true # Node as PID 1 ignores Ctrl-C/docker stop; a tiny init process passes the signal on
     depends_on:
       - redis
 
   redis:
     image: redis:8-alpine
+    ports:
+      - "6379:6379" # so a server run outside Docker (e.g. for profiling) can reach it

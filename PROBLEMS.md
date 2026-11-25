@@ -31,6 +31,7 @@ When one gets fixed, it moves to DECISIONS.md as the reason for that step.
 ## Redis
 - **Redis keeps everything in RAM.** If it dies, every order and the outbox are lost. The outbox is the truth about matches, so it has to be durable: Redis persistence to disk (AOF) and a replica.
 - **dual write:** writing a match to Redis *and* to Kafka (or anything else) as two separate steps can leave them disagreeing after a crash in between. Fix: the transactional outbox pattern. Write the outbox in the same atomic step as the claim, and have a relay copy it to Kafka for other services.
+- **seen under load: both sides waiting, nobody matched** (1000 connections: 670 riders and 670 drivers waiting at the same spot). Everyone ranks the same candidates the same way, so hundreds race for the same top 5. Whoever loses all 5 claims just holds and waits, and isn't retried until their next poll (up to 25s). Nothing is lost, but matches are delayed exactly at peak. Ideas: on losing all claims, search again instead of holding; randomize among near-equal candidates so racers spread out; a single matcher per area (no races at all).
 - **high contention (busy hours):** many riders racing for few drivers means many lost claims and retries. Locking the whole map would make every rider wait in one line, exactly at peak. Better: bigger candidate batches; at the extreme, one matcher per area handling orders one at a time (single writer, e.g. one consumer per Kafka partition).
 
 ## Matching

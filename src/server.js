@@ -1,6 +1,7 @@
 import express from "express";
 import { fill, cancel } from "./fill.js";
 
+// HTTP only. Everything else is in fill.js.
 const app = express();
 app.use(express.json());
 
@@ -11,3 +12,8 @@ app.delete("/drivers/:id", (req, res) => cancel("driver", req.params.id, res));
 
 const PORT = process.env.PORT ?? 3000;
 app.listen(PORT, () => console.log(`listening on port ${PORT}`));
+
+// Exit normally on Ctrl-C / docker stop, so things that run at exit get to run
+// (e.g. `node --cpu-prof` only writes its profile on a normal exit).
+process.on("SIGINT", () => process.exit());
+process.on("SIGTERM", () => process.exit());

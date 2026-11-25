@@ -72,4 +72,13 @@ Builds the design above, still one server. Code is split by job, and dependencie
 - src/fill.js: join → nearby → rank → claim the best 5 in turn → otherwise keep waiting. The request is held *before* the first Redis call: while we wait on Redis, another request may match us, and its news needs somewhere to go (otherwise the client only finds out on its next poll, up to 25s later).
 - tested: the four earlier cases behave the same, and 20 riders racing for one driver produce exactly one match.
 
+## measured: where the CPU goes, and where it breaks (2026-10-21)
+Question: we added servers "for throughput" without checking what the work actually is.
+- load.js (autocannon): driver, rider, driver, rider... all at one spot, so every request finishes fast. `node load.js <connections> <seconds>`.
+- profile (`node --cpu-prof`, 10 connections, ~7.8k req/s on one process): our code is 4.7% of CPU time, the matcher 0.4%. Node's HTTP/socket work is 56%, Express 18%, the Redis client 8%. The work is moving and parsing bytes, not business logic.
+- breaking point: 10 connections ~8.2k req/s, 1 ms median. 100 connections: same throughput, latency up (p97.5 31 ms), a few 2s timeouts. 1000 connections: throughput collapses to ~1.8k req/s, p97.5 1.3 s, ~1k timeouts. Redis sat at ~20-25% CPU throughout, so the Node process is the limit, not Redis.
+- correction: a big city with 50k people waiting and polling every 25s is ~2k req/s, within one process. Multiple servers are justified by availability (one crash shouldn't stop the city), not throughput.
+- found by load, not fixed yet: under contention, riders and drivers both end up waiting at the same spot (see PROBLEMS.md).
+- small changes for this: Redis port published in compose (so a server outside Docker can reach it); the server exits normally on SIGINT/SIGTERM (the profiler only writes on a normal exit); profiles/ is gitignored.
+
 Known problems not tackled yet live in PROBLEMS.md.
