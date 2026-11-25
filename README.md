@@ -1,6 +1,6 @@
 # Driver Match
 
-*Twenty riders ask for one driver at the same moment. Exactly one gets the ride.*
+*Real-time rider/driver matching on a shared Redis order book.*
 
 A ride-matching server that treats a city like a market: riders and drivers are
 two sides of one **order book**, and a match is a trade. Node.js, Express,
@@ -18,7 +18,7 @@ Redis, a few lines of Lua.
 
 ---
 
-## The cast
+## Design
 
 Six small parts, each in its own file. Dependencies point one way only:
 `server → fill → (book, matcher, delivery) → redis`.
@@ -66,12 +66,12 @@ sequenceDiagram
 
 ---
 
-## How it got here
+## History
 
-Each version exists because the one before it broke in a specific way. The full
-reasoning is in [`DECISIONS.md`](DECISIONS.md).
+Each version addresses a problem in the one before it. Details are in
+[`DECISIONS.md`](DECISIONS.md).
 
-| | What changed | What broke in the version before |
+| | What changed | Problem in the previous version |
 |---|---|---|
 | **v0** | One Express server, everything in memory. Rider gets the nearest free driver or "none". | — |
 | **v1** | Riders can wait, and poll for their match. | A rider with no driver had to keep asking by hand. |
@@ -85,20 +85,18 @@ failover.
 
 ---
 
-## Measured, not assumed
+## Performance
 
-The reason for more servers was supposed to be throughput. So it was measured
-([`load.js`](load.js), autocannon, one process):
+Load test with [`load.js`](load.js) (autocannon) against one process:
 
-- **~8k requests/s** at 10 connections, 1 ms median.
-- Of the CPU time, **matching logic is 4.7%** (the matcher itself 0.4%). Node's
-  HTTP handling is 56%, Express 18%, the Redis client 8%. The work is moving
-  bytes, not making decisions.
-- At **1000 connections** throughput collapses to ~1.8k req/s, while Redis sits
-  at 20–25% CPU. The Node process is the limit, not Redis.
+- ~8k requests/s at 10 connections, 1 ms median latency.
+- CPU profile: matching logic is 4.7% of the time (the matcher itself 0.4%);
+  Node's HTTP handling is 56%, Express 18%, the Redis client 8%.
+- At 1000 connections throughput drops to ~1.8k req/s while Redis stays at
+  20–25% CPU, so the Node process is the bottleneck.
 
-A big city with 50k people waiting, each polling every 25 s, is ~2k req/s: one
-process handles it. More servers are for **surviving a crash**, not for speed.
+For scale: 50k people waiting and polling every 25 s is ~2k req/s, within one
+process. Running more than one server is mainly for availability.
 
 ---
 
@@ -123,10 +121,9 @@ Load test: `node load.js <connections> <seconds>` against a running server.
 
 ---
 
-## Open wounds
+## Known limitations
 
-What's known to be broken, and not fixed yet. The full list, with ideas for
-each, is in [`PROBLEMS.md`](PROBLEMS.md).
+The full list, with possible fixes, is in [`PROBLEMS.md`](PROBLEMS.md).
 
 - **Under heavy load, both sides can end up waiting at the same spot.**
   Everyone ranks the same candidates the same way, so hundreds race for the same
